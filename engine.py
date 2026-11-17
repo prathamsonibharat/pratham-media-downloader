@@ -55,9 +55,55 @@ def _http_download(url: str, dest: Path) -> None:
         shutil.copyfileobj(r, f)
 
 
+def _has_audio(path: Path) -> bool | None:
+    """True/False if the file has an audio track; None if ffprobe isn't available."""
+    if not shutil.which("ffprobe"):
+        return None
+    import subprocess
+
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+         "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, timeout=20,
+    ).stdout.strip()
+    return bool(out)
+
+
+def _ensure_audio(video: Path, fallback_url: str | None) -> None:
+    """Safety net: if the best-quality file came out silent but Instagram's regular
+    MP4 has sound, copy that sound into it (no re-encoding). If merging fails,
+    use Instagram's regular MP4 instead, since a file with sound beats a silent one."""
+    if not fallback_url or _has_audio(video) is not False or not shutil.which("ffmpeg"):
+        return
+    import subprocess
+
+    alt = video.with_name(video.stem + "_alt.mp4")
+    merged = video.with_name(video.stem + "_merged.mp4")
+    try:
+        _http_download(fallback_url, alt)
+        if not _has_audio(alt):
+            return  # the original post is genuinely silent
+        r = subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", str(video), "-i", str(alt),
+             "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-shortest",
+             "-movflags", "+faststart", str(merged)],
+            capture_output=True, timeout=120,
+        )
+        if r.returncode == 0 and _has_audio(merged):
+            merged.replace(video)
+        else:
+            alt.replace(video)
+    except Exception:
+        pass
+    finally:
+        for f in (alt, merged):
+            f.unlink(missing_ok=True)
+
+
 def _media_info(path: Path, kind: str, width=None, height=None) -> dict:
     return {
         "kind": kind,
+        "has_audio": _has_audio(path) if kind == "video" else None,
         "filename": path.name,
         "relpath": str(path.relative_to(DOWNLOAD_DIR)),
         "size": path.stat().st_size,
@@ -185,6 +231,7 @@ def fetch(url: str, quality: str = "best") -> dict:
                     final = out_dir / f"{shortcode}_{i:02d}.mp4"
                     p.rename(final)
                     p = final
+                    _ensure_audio(p, n.get("video_url"))
                 items.append(_media_info(p, "video", *_probe(p)))
             else:
                 p = out_dir / f"{shortcode}_{i:02d}.jpg"

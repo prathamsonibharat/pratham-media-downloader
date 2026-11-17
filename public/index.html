@@ -201,6 +201,8 @@
   .item .info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .item .meta { font: 11.5px 'IBM Plex Mono', monospace; color: var(--muted); line-height: 1.45; }
   .item .meta b { color: var(--text); font-weight: 500; }
+  .item .meta .snd { color: var(--ok); }
+  .item .meta .snd.off { color: var(--muted); font-style: italic; }
 
   footer { margin-top: 26px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; }
   .credit { margin-top: 10px; text-align: center; font-size: 11.5px; color: var(--muted); opacity: .75; font-family: 'IBM Plex Mono', monospace; }
@@ -224,7 +226,7 @@
     <div class="modes" role="radiogroup" aria-label="Video quality">
       <button class="mode-btn active" data-q="best" role="radio" aria-checked="true">
         <span class="t">Highest quality</span>
-        <span class="d">Sharpest stream · may be VP9</span>
+        <span class="d">Sharpest · may not open in QuickTime</span>
       </button>
       <button class="mode-btn" data-q="compat" role="radio" aria-checked="false">
         <span class="t">Max compatibility</span>
@@ -437,7 +439,10 @@
       const meta = document.createElement("div");
       meta.className = "meta";
       const res = it.width ? `<b>${it.width}×${it.height}</b><br>` : "";
-      meta.innerHTML = `${res}${it.kind === "video" ? "MP4" : "JPG"} · ${fmtSize(it.size)}`;
+      const sound = it.kind !== "video" || it.has_audio == null ? ""
+        : it.has_audio ? `<br><span class="snd">♪ with audio</span>`
+        : `<br><span class="snd off">no sound in original</span>`;
+      meta.innerHTML = `${res}${it.kind === "video" ? "MP4" : "JPG"} · ${fmtSize(it.size)}${sound}`;
       const a = document.createElement("a");
       a.className = "dl-btn";
       a.href = it.download;
