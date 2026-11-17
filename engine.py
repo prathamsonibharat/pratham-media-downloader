@@ -1,4 +1,4 @@
-"""Download engine for Pratham Instagram Media Downloader.
+"""Download engine for Pratham Media Downloader (Instagram + YouTube).
 
 Strategy (always aims for the original / highest quality):
   * instaloader enumerates the post (single image, single video, or carousel)
@@ -28,6 +28,15 @@ DOWNLOAD_DIR = Path(os.environ.get("IG_DOWNLOAD_DIR", BASE_DIR / "downloads"))
 KEEP_HOURS = float(os.environ.get("IG_KEEP_HOURS", "0") or 0)
 COOKIES_BROWSER = os.environ.get("IG_COOKIES_BROWSER", "").strip() or None
 
+# YouTube limits for hosted servers (0 = no limit).
+YT_MAX_MINUTES = float(os.environ.get("YT_MAX_MINUTES", "0") or 0)
+YT_MAX_HEIGHT = int(os.environ.get("YT_MAX_HEIGHT", "0") or 0)
+# yt-dlp needs a JavaScript runtime to unlock all YouTube formats.
+JS_RUNTIMES = {name: {} for name in ("deno", "node", "bun") if shutil.which(name)}
+
+YT_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/|v/)|youtu\.be/)([A-Za-z0-9_-]{11})"
+)
 SHORTCODE_RE = re.compile(r"instagram\.com/(?:[\w.]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)")
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -37,6 +46,18 @@ UA = (
 
 class DownloadError(Exception):
     pass
+
+
+def detect_platform(url: str) -> str:
+    if YT_RE.search(url):
+        return "youtube"
+    if SHORTCODE_RE.search(url):
+        return "instagram"
+    raise DownloadError(
+        "That doesn't look like an Instagram or YouTube link. Paste a post, reel, "
+        "video or Shorts link, e.g. https://www.instagram.com/reel/XXXX/ or "
+        "https://youtube.com/shorts/XXXX"
+    )
 
 
 def extract_shortcode(url: str) -> str:
@@ -186,8 +207,97 @@ def _cleanup_old() -> None:
 
 
 def fetch(url: str, quality: str = "best") -> dict:
-    shortcode = extract_shortcode(url)
+    platform = detect_platform(url.strip())
     _cleanup_old()
+    if platform == "youtube":
+        return fetch_youtube(url.strip(), quality)
+    return fetch_instagram(url, quality)
+
+
+YT_FORMATS = {
+    # Highest resolution/bitrate (often VP9 or AV1, up to 4K/8K) + best audio.
+    "best": "bestvideo*{h}+bestaudio/best{h}",
+    # H.264 + AAC: plays in QuickTime, iPhone, WhatsApp, editors (YouTube tops out at 1080p here).
+    "compat": "bestvideo*[vcodec^=avc1]{h}+bestaudio[ext=m4a]/best[ext=mp4]{h}/best{h}",
+}
+
+
+def fetch_youtube(url: str, quality: str = "best") -> dict:
+    video_id = YT_RE.search(url).group(1)
+    is_short = "/shorts/" in url
+    out_dir = DOWNLOAD_DIR / f"youtube_{video_id}"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    h = f"[height<={YT_MAX_HEIGHT}]" if YT_MAX_HEIGHT else ""
+    opts = {
+        "format": YT_FORMATS.get(quality, YT_FORMATS["best"]).format(h=h),
+        "merge_output_format": "mp4",
+        "outtmpl": str(out_dir / "%(title).80B [%(id)s].%(ext)s"),
+        "windowsfilenames": True,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
+    }
+    if JS_RUNTIMES:
+        opts["js_runtimes"] = JS_RUNTIMES
+    if COOKIES_BROWSER:
+        opts["cookiesfrombrowser"] = (COOKIES_BROWSER,)
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+            if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming"):
+                raise DownloadError("This is a live stream. Try again once the stream has ended.")
+            minutes = (info.get("duration") or 0) / 60
+            if YT_MAX_MINUTES and minutes > YT_MAX_MINUTES:
+                raise DownloadError(
+                    f"This video is {minutes:.0f} min long. This server only handles videos up to "
+                    f"{YT_MAX_MINUTES:.0f} min. Run the tool on your own computer for longer ones."
+                )
+            ydl.process_ie_result(info, download=True)
+    except DownloadError:
+        raise
+    except Exception as e:
+        raise DownloadError(_friendly_youtube(e))
+
+    files = sorted(out_dir.glob("*.mp4"))
+    if not files:
+        raise DownloadError("YouTube didn't return a downloadable video for this link.")
+    p = files[0]
+    return {
+        "platform": "youtube",
+        "kind": "short" if is_short else "video",
+        "shortcode": video_id,
+        "owner": info.get("channel") or info.get("uploader"),
+        "caption": info.get("title"),
+        "folder": str(out_dir),
+        "items": [_media_info(p, "video", *_probe(p))],
+    }
+
+
+def _friendly_youtube(e: Exception) -> str:
+    text = str(e).replace("ERROR: ", "")
+    low = text.lower()
+    if "not a bot" in low or "sign in to confirm" in low:
+        return ("YouTube is blocking this server as a bot (common on cloud hosting). "
+                "Running the tool on your own computer usually works.")
+    if "private video" in low:
+        return "This video is private."
+    if "age" in low and ("restricted" in low or "confirm your age" in low):
+        return ("This video is age-restricted. Run the tool locally with "
+                "IG_COOKIES_BROWSER=chrome so it uses your signed-in YouTube session.")
+    if "members" in low:
+        return "This video is for channel members only."
+    if "unavailable" in low:
+        return "This video is unavailable (removed, private, or blocked in this region)."
+    return "Couldn't download this YouTube video. Details: " + text[:300]
+
+
+def fetch_instagram(url: str, quality: str = "best") -> dict:
+    shortcode = extract_shortcode(url)
     canonical = f"https://www.instagram.com/p/{shortcode}/"
 
     nodes, meta, insta_err = None, {}, None
@@ -239,6 +349,8 @@ def fetch(url: str, quality: str = "best") -> dict:
                 items.append(_media_info(p, "image", *_probe(p)))
 
     return {
+        "platform": "instagram",
+        "kind": None,
         "shortcode": shortcode,
         "owner": meta.get("owner"),
         "caption": meta.get("caption"),

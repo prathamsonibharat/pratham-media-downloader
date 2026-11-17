@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Pratham Instagram Media Downloader</title>
-<meta name="description" content="Paste an Instagram post, reel or carousel link and download the photos and videos at the highest quality available. Free and open source." />
+<title>Pratham Media Downloader</title>
+<meta name="description" content="Paste an Instagram post, reel or carousel link, or a YouTube video or Short, and download it at the highest quality available. Free and open source." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='8' fill='%2312100E' stroke='%23E8A33D' stroke-width='2.5'/%3E%3Cpath d='M16 9v11m-5-5 5 5 5-5' stroke='%23E8A33D' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -69,6 +69,17 @@
   p.lede { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; max-width: 52ch; }
 
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; }
+
+  /* ---------- platform tabs ---------- */
+  .tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+  .tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: none; border: 0; border-radius: 6px; padding: 9px 10px; color: var(--muted);
+    font: 600 13.5px 'Inter', sans-serif; cursor: pointer; transition: background .15s ease, color .15s ease;
+  }
+  .tab svg { width: 16px; height: 16px; }
+  .tab.active { background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+  .tab.active svg { color: var(--accent); }
 
   /* ---------- quality cards ---------- */
   .modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 18px; }
@@ -197,6 +208,9 @@
   .item:nth-child(2) { animation-delay: .06s; } .item:nth-child(3) { animation-delay: .12s; } .item:nth-child(4) { animation-delay: .18s; }
   @keyframes pop { from { opacity: 0; transform: translateY(8px); } }
   .item .media { background: #000; aspect-ratio: 4/5; }
+  .grid.single { grid-template-columns: 1fr; }
+  .grid.single .media { aspect-ratio: auto; max-height: 560px; display: flex; justify-content: center; }
+  .grid.single .media video, .grid.single .media img { height: auto; max-height: 560px; width: auto; max-width: 100%; }
   .item img, .item video { width: 100%; height: 100%; object-fit: contain; display: block; }
   .item .info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .item .meta { font: 11.5px 'IBM Plex Mono', monospace; color: var(--muted); line-height: 1.45; }
@@ -216,13 +230,24 @@
   <header>
     <div class="eyebrow-row">
       <div class="mark" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
-      <div class="eyebrow">Pratham Instagram Media Downloader</div>
+      <div class="eyebrow">Pratham Media Downloader</div>
     </div>
-    <h1>Paste the link, keep the post. At full quality.</h1>
-    <p class="lede">Reels, videos, single photos and carousels: paste an Instagram link and get every photo and clip at the highest resolution Instagram serves. No watermark, no sign-up, no re-compression.</p>
+    <h1>Paste the link, keep the video. At full quality.</h1>
+    <p class="lede">Instagram reels, photos and carousels, plus YouTube videos and Shorts. Paste a link and get the highest resolution the platform serves, with sound. No watermark, no sign-up, no re-compression.</p>
   </header>
 
   <div class="panel">
+    <div class="tabs" role="tablist" aria-label="Platform">
+      <button class="tab active" data-p="instagram" role="tab" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+        Instagram
+      </button>
+      <button class="tab" data-p="youtube" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="m10 9 5 3-5 3z" fill="currentColor"/></svg>
+        YouTube
+      </button>
+    </div>
+
     <div class="modes" role="radiogroup" aria-label="Video quality">
       <button class="mode-btn active" data-q="best" role="radio" aria-checked="true">
         <span class="t">Highest quality</span>
@@ -230,27 +255,32 @@
       </button>
       <button class="mode-btn" data-q="compat" role="radio" aria-checked="false">
         <span class="t">Max compatibility</span>
-        <span class="d">H.264 MP4 · plays everywhere</span>
+        <span class="d" id="compatDesc">H.264 MP4 · plays everywhere</span>
       </button>
     </div>
 
     <form id="form" class="linkbox" novalidate>
-      <p class="main"><b>Paste a link</b> to a post, reel or carousel</p>
-      <p class="sub">Photos always download at their original resolution. The setting above only affects videos.</p>
+      <p class="main"><b>Paste a link</b> <span id="linkWhat">to a post, reel or carousel</span></p>
+      <p class="sub" id="linkSub">Photos always download at their original resolution. The setting above only affects videos.</p>
       <div class="field">
-        <input type="url" id="url" placeholder="https://www.instagram.com/reel/…" autocomplete="off" spellcheck="false" aria-label="Instagram link" />
+        <input type="url" id="url" placeholder="https://www.instagram.com/reel/…" autocomplete="off" spellcheck="false" aria-label="Instagram or YouTube link" />
         <button type="button" class="paste-btn" id="pasteBtn">Paste</button>
       </div>
       <div class="types" id="types">
-        <span data-k="reel">Reel</span><span data-k="video">Video</span><span data-k="photo">Photo</span><span data-k="carousel">Carousel</span>
+        <span data-k="reel" data-p="instagram">Reel</span><span data-k="video" data-p="instagram">Video</span><span data-k="photo" data-p="instagram">Photo</span><span data-k="carousel" data-p="instagram">Carousel</span>
+        <span data-k="yt-video" data-p="youtube" hidden>Video</span><span data-k="yt-short" data-p="youtube" hidden>Short</span>
       </div>
     </form>
 
     <details class="link-note">
-      <summary>Private post, or Instagram says "try again later"?</summary>
-      <div class="body">
+      <summary id="noteSummary">Private post, or Instagram says "try again later"?</summary>
+      <div class="body" id="noteIg">
         Only public posts work without signing in, and Instagram limits how many it hands out per hour.
         If you run this tool yourself, start it with <code>IG_COOKIES_BROWSER=chrome ./run.sh</code> so it uses your own logged-in browser session. That also unlocks 1080p for many reels.
+      </div>
+      <div class="body" id="noteYt" hidden>
+        Highest quality grabs the best stream YouTube has (up to 4K/8K, often VP9 or AV1). Max compatibility gives H.264, which YouTube offers up to 1080p.
+        Age-restricted videos need a signed-in session: run it yourself with <code>IG_COOKIES_BROWSER=chrome ./run.sh</code>. Live streams can be downloaded once they end.
       </div>
     </details>
 
@@ -264,7 +294,7 @@
         <div class="frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="7" y="7" width="14" height="14" rx="2"/><path d="M3 15V5a2 2 0 0 1 2-2h10"/></svg></div>
         <div class="tray"></div>
       </div>
-      <div class="status-line"><span id="statusLabel">Reading the post…</span><span id="statusTime">0s</span></div>
+      <div class="status-line"><span id="statusLabel">Reading the link…</span><span id="statusTime">0s</span></div>
       <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
     </div>
 
@@ -282,19 +312,55 @@
     </div>
   </div>
 
-  <footer>Videos: the best video and audio streams are fetched separately and merged, often sharper than the file Instagram's app saves. Photos: the original upload size, not the compressed preview. Only download content you own or have permission to use.</footer>
-  <div class="credit">Made by Pratham Soni &middot; Open source (MIT) &middot; Not affiliated with Instagram or Meta</div>
+  <footer>Works with Instagram and YouTube. Videos: the best video and audio streams are fetched separately and merged, often sharper than what the apps save. Photos: the original upload size, not the compressed preview. Only download content you own or have permission to use.</footer>
+  <div class="credit">Made by Pratham Soni &middot; Open source (MIT) &middot; Not affiliated with Instagram, Meta, YouTube or Google</div>
 </div>
 
 <script src="config.js"></script>
 <script>
 (function () {
-  const API = (window.PIMD_API_BASE || "").replace(/\/$/, "");
+  const API = (window.PMD_API_BASE || "").replace(/\/$/, "");
   const $ = (id) => document.getElementById(id);
   const urlInput = $("url"), runBtn = $("runBtn"), working = $("working"), errorBox = $("errorBox");
   const results = $("results"), grid = $("grid");
   const IG_RE = /instagram\.com\/(?:[\w.]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
-  let quality = "best", busy = false, current = null;
+  const YT_RE = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|(shorts)\/|live\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+  let quality = "best", busy = false, current = null, platform = "instagram";
+
+  const PLATFORM_TEXT = {
+    instagram: {
+      what: "to a post, reel or carousel",
+      sub: "Photos always download at their original resolution. The setting above only affects videos.",
+      placeholder: "https://www.instagram.com/reel/…",
+      compat: "H.264 MP4 · plays everywhere",
+      note: 'Private post, or Instagram says "try again later"?',
+    },
+    youtube: {
+      what: "to a YouTube video or Short",
+      sub: "Video and sound are fetched separately at their best and merged into one MP4.",
+      placeholder: "https://youtube.com/shorts/…  or  https://youtu.be/…",
+      compat: "H.264 MP4 · up to 1080p · plays everywhere",
+      note: "About YouTube quality, age-restricted and live videos",
+    },
+  };
+  function setPlatform(p) {
+    if (p === platform) return;
+    platform = p;
+    document.querySelectorAll(".tab").forEach((t) => {
+      t.classList.toggle("active", t.dataset.p === p);
+      t.setAttribute("aria-selected", t.dataset.p === p);
+    });
+    const t = PLATFORM_TEXT[p];
+    $("linkWhat").textContent = t.what;
+    $("linkSub").textContent = t.sub;
+    urlInput.placeholder = t.placeholder;
+    $("compatDesc").textContent = t.compat;
+    $("noteSummary").textContent = t.note;
+    $("noteIg").hidden = p !== "instagram";
+    $("noteYt").hidden = p !== "youtube";
+    document.querySelectorAll("#types span").forEach((s) => { s.hidden = s.dataset.p !== p; });
+  }
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => { setPlatform(t.dataset.p); urlInput.focus(); }));
 
   // A free hosted backend sleeps when idle; poke it as soon as the page opens
   // so it's usually awake by the time a link is pasted.
@@ -318,16 +384,20 @@
   // Highlight the detected link type and update the button
   let lastUrl = null;
   function onUrlChange() {
-    const m = urlInput.value.match(IG_RE);
+    const ig = urlInput.value.match(IG_RE), yt = urlInput.value.match(YT_RE);
+    const m = ig || yt;
     if (urlInput.value !== lastUrl) {
       lastUrl = urlInput.value;
+      if (yt) setPlatform("youtube"); else if (ig) setPlatform("instagram");
       document.querySelectorAll("#types span").forEach((s) => s.classList.remove("hit"));
-      const k = !m || m[1] === "p" ? null : (m[1] === "tv" ? "video" : "reel");
+      const k = yt ? (yt[1] ? "yt-short" : "yt-video")
+        : !ig || ig[1] === "p" ? null : (ig[1] === "tv" ? "video" : "reel");
       if (k) document.querySelector(`#types [data-k=${k}]`).classList.add("hit");
     }
     if (busy) return;
     runBtn.disabled = !m;
-    runBtn.textContent = m ? "Download media" : (urlInput.value.trim() ? "That isn't an Instagram post link" : "Paste a link to begin");
+    runBtn.textContent = yt ? (yt[1] ? "Download Short" : "Download video") : ig ? "Download media"
+      : (urlInput.value.trim() ? "That isn't an Instagram or YouTube link" : "Paste a link to begin");
   }
   urlInput.addEventListener("input", onUrlChange);
   urlInput.addEventListener("paste", () => setTimeout(() => { onUrlChange(); if (!runBtn.disabled) start(); }, 0));
@@ -352,7 +422,7 @@
   runBtn.addEventListener("click", start);
 
   // Working animation + staged progress (the server does it all in one request)
-  const STAGES = [[0, "Reading the post…", 12], [2, "Finding the highest quality…", 35], [5, "Downloading media…", 60], [10, "Merging video and audio…", 80], [20, "Almost there…", 92]];
+  const STAGES = [[0, "Reading the link…", 12], [2, "Finding the highest quality…", 35], [5, "Downloading media…", 60], [10, "Merging video and audio…", 80], [20, "Almost there…", 92]];
   let timer = null;
   function showWorking(on) {
     working.hidden = !on;
@@ -413,17 +483,21 @@
     const parts = [];
     if (vids) parts.push(vids + (vids === 1 ? " video" : " videos"));
     if (photos) parts.push(photos + (photos === 1 ? " photo" : " photos"));
-    $("resTitle").textContent = (data.owner ? "@" + data.owner + " · " : "") + parts.join(" + ");
+    $("resTitle").textContent = data.platform === "youtube"
+      ? (data.owner ? data.owner + " · " : "") + (data.kind === "short" ? "YouTube Short" : "YouTube video")
+      : (data.owner ? "@" + data.owner + " · " : "") + parts.join(" + ");
     $("resCaption").textContent = data.caption || "";
     $("zipBtn").hidden = !data.zip;
     if (data.zip) $("zipBtn").href = data.zip;
     $("revealBtn").hidden = !data.can_reveal;
 
     // Light up the detected type chips
-    const kind = n > 1 ? "carousel" : (vids ? (/\/(reel|reels)\//.test(urlInput.value) ? "reel" : "video") : "photo");
+    const kind = data.platform === "youtube" ? (data.kind === "short" ? "yt-short" : "yt-video")
+      : n > 1 ? "carousel" : (vids ? (/\/(reel|reels)\//.test(urlInput.value) ? "reel" : "video") : "photo");
     document.querySelectorAll("#types span").forEach((s) => s.classList.toggle("hit", s.dataset.k === kind));
 
     grid.innerHTML = "";
+    grid.classList.toggle("single", n === 1);
     data.items.forEach((it, i) => {
       const el = document.createElement("div");
       el.className = "item";

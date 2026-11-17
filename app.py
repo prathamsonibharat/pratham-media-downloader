@@ -1,4 +1,4 @@
-"""Pratham Instagram Media Downloader — local web app.
+"""Pratham Media Downloader — local web app.
 
 Run:  ./run.sh   (or: .venv/bin/python app.py)  then open http://127.0.0.1:5173
 """
@@ -153,5 +153,5 @@ def reveal():
 if __name__ == "__main__":
     engine.DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     port = int(os.environ.get("PORT", 5173))
-    print(f"\n  Pratham Instagram Media Downloader → http://127.0.0.1:{port}\n")
+    print(f"\n  Pratham Media Downloader → http://127.0.0.1:{port}\n")
     app.run(host=os.environ.get("HOST", "127.0.0.1"), port=port, debug=False)
