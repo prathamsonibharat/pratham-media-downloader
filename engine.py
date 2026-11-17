@@ -317,6 +317,8 @@ def fetch_youtube(url: str, quality: str = "best") -> dict:
         opts.update({
             "format": YT_FORMATS.get(quality, YT_FORMATS["best"]).format(h=h),
             "merge_output_format": "mp4",
+            # Same resolution? Prefer H.264 + AAC, which every phone and Mac can play.
+            "format_sort": ["res", "fps", "vcodec:h264", "acodec:aac"],
         })
     if JS_RUNTIMES:
         opts["js_runtimes"] = JS_RUNTIMES

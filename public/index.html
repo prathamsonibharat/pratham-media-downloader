@@ -261,13 +261,13 @@
     </div>
 
     <div class="modes" role="radiogroup" aria-label="Download format">
-      <button class="mode-btn active" data-q="best" role="radio" aria-checked="true">
-        <span class="t">Highest quality</span>
-        <span class="d">Sharpest · may not open in QuickTime</span>
-      </button>
-      <button class="mode-btn" data-q="compat" role="radio" aria-checked="false">
+      <button class="mode-btn active" data-q="compat" role="radio" aria-checked="true">
         <span class="t">Max compatibility</span>
         <span class="d" id="compatDesc">H.264 MP4 · plays everywhere</span>
+      </button>
+      <button class="mode-btn" data-q="best" role="radio" aria-checked="false">
+        <span class="t">Highest quality</span>
+        <span class="d">Sharpest · may not play on iPhone / Mac</span>
       </button>
       <button class="mode-btn" data-q="mp3" role="radio" aria-checked="false">
         <span class="t">Audio only</span>
@@ -344,7 +344,7 @@
   const results = $("results"), grid = $("grid");
   const IG_RE = /instagram\.com\/(?:[\w.]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
   const YT_RE = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|(shorts)\/|live\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
-  let quality = "best", busy = false, current = null, platform = "instagram";
+  let quality = "compat", busy = false, current = null, platform = "instagram";
 
   const PLATFORM_TEXT = {
     instagram: {
