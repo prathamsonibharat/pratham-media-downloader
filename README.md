@@ -7,6 +7,7 @@ Paste an Instagram **post, reel or carousel** link, or a **YouTube video or Shor
 - **Carousels:** every slide, photo or video, plus a one-click `.zip`.
 - **YouTube videos & Shorts:** best video + best audio merged into one MP4, up to 4K/8K when you run it locally. Playlist links download just the video you linked.
 - **Two video modes:** *Highest quality* (may be VP9) or *Max compatibility* (H.264, which plays in QuickTime, WhatsApp, iPhone Photos and video editors).
+- **Audio only (MP3):** saves just the sound as a high-quality MP3 (LAME V0 VBR). YouTube MP3s include the title, channel and thumbnail as cover art; for Instagram, every video in the post becomes its own MP3.
 
 Built on two well-established open-source projects: [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [instaloader](https://github.com/instaloader/instaloader).
 

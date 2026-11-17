@@ -121,10 +121,51 @@ def _ensure_audio(video: Path, fallback_url: str | None) -> None:
             f.unlink(missing_ok=True)
 
 
+def _audio_details(path: Path) -> tuple[float | None, int | None]:
+    """(duration in seconds, bitrate in kbps) of an audio file."""
+    if not shutil.which("ffprobe"):
+        return None, None
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration,bit_rate",
+             "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, timeout=20,
+        ).stdout.strip().split(",")
+        return round(float(out[0]), 1), round(int(out[1]) / 1000)
+    except Exception:
+        return None, None
+
+
+MP3_QUALITY = "0"  # LAME VBR V0: best-quality VBR (~220–260 kbps), transparent for any source
+
+
+def _to_mp3(src: Path, dest: Path, title: str | None = None, artist: str | None = None) -> bool:
+    """Extract the sound of a video into a high-quality MP3. False if it has no sound."""
+    if not _has_audio(src):
+        return False
+    import subprocess
+
+    cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-map", "0:a:0", "-vn",
+           "-c:a", "libmp3lame", "-q:a", MP3_QUALITY, "-id3v2_version", "3"]
+    if title:
+        cmd += ["-metadata", f"title={title}"]
+    if artist:
+        cmd += ["-metadata", f"artist={artist}"]
+    r = subprocess.run(cmd + [str(dest)], capture_output=True, timeout=300)
+    return r.returncode == 0 and dest.exists()
+
+
 def _media_info(path: Path, kind: str, width=None, height=None) -> dict:
+    duration = bitrate = None
+    if kind == "audio":
+        duration, bitrate = _audio_details(path)
     return {
         "kind": kind,
         "has_audio": _has_audio(path) if kind == "video" else None,
+        "duration": duration,
+        "bitrate": bitrate,
         "filename": path.name,
         "relpath": str(path.relative_to(DOWNLOAD_DIR)),
         "size": path.stat().st_size,
@@ -231,9 +272,8 @@ def fetch_youtube(url: str, quality: str = "best") -> dict:
     out_dir.mkdir(parents=True)
 
     h = f"[height<={YT_MAX_HEIGHT}]" if YT_MAX_HEIGHT else ""
+    audio_only = quality == "mp3"
     opts = {
-        "format": YT_FORMATS.get(quality, YT_FORMATS["best"]).format(h=h),
-        "merge_output_format": "mp4",
         "outtmpl": str(out_dir / "%(title).80B [%(id)s].%(ext)s"),
         "windowsfilenames": True,
         "noplaylist": True,
@@ -241,6 +281,23 @@ def fetch_youtube(url: str, quality: str = "best") -> dict:
         "no_warnings": True,
         "noprogress": True,
     }
+    if audio_only:
+        # Best audio stream → MP3 with title/artist tags and the video thumbnail as cover art.
+        opts.update({
+            "format": "bestaudio/best",
+            "writethumbnail": True,
+            "postprocessors": [
+                {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": MP3_QUALITY},
+                {"key": "FFmpegMetadata", "add_metadata": True},
+                {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"},
+                {"key": "EmbedThumbnail"},
+            ],
+        })
+    else:
+        opts.update({
+            "format": YT_FORMATS.get(quality, YT_FORMATS["best"]).format(h=h),
+            "merge_output_format": "mp4",
+        })
     if JS_RUNTIMES:
         opts["js_runtimes"] = JS_RUNTIMES
     if COOKIES_BROWSER:
@@ -263,10 +320,13 @@ def fetch_youtube(url: str, quality: str = "best") -> dict:
     except Exception as e:
         raise DownloadError(_friendly_youtube(e))
 
-    files = sorted(out_dir.glob("*.mp4"))
+    files = sorted(out_dir.glob("*.mp3" if audio_only else "*.mp4"))
     if not files:
-        raise DownloadError("YouTube didn't return a downloadable video for this link.")
+        raise DownloadError("YouTube didn't return a downloadable "
+                            + ("audio track" if audio_only else "video") + " for this link.")
     p = files[0]
+    for leftover in out_dir.glob("*.jpg"):  # cover art is already inside the MP3
+        leftover.unlink()
     return {
         "platform": "youtube",
         "kind": "short" if is_short else "video",
@@ -274,7 +334,7 @@ def fetch_youtube(url: str, quality: str = "best") -> dict:
         "owner": info.get("channel") or info.get("uploader"),
         "caption": info.get("title"),
         "folder": str(out_dir),
-        "items": [_media_info(p, "video", *_probe(p))],
+        "items": [_media_info(p, "audio") if audio_only else _media_info(p, "video", *_probe(p))],
     }
 
 
@@ -297,6 +357,8 @@ def _friendly_youtube(e: Exception) -> str:
 
 
 def fetch_instagram(url: str, quality: str = "best") -> dict:
+    if quality == "mp3":
+        return _instagram_mp3(url)
     shortcode = extract_shortcode(url)
     canonical = f"https://www.instagram.com/p/{shortcode}/"
 
@@ -369,3 +431,29 @@ def _friendly(*errors) -> str:
             "so it uses your logged-in browser session. Details: " + text[:300]
         )
     return "Couldn't download this post. Details: " + text[:400]
+
+
+def _instagram_mp3(url: str) -> dict:
+    """Download the post's videos, then keep just their sound as MP3s."""
+    result = fetch_instagram(url, "compat")  # H.264 + AAC: same audio, smaller download
+    out_dir = Path(result["folder"])
+    owner = result.get("owner")
+    videos = [it for it in result["items"] if it["kind"] == "video"]
+    multi = len(videos) > 1
+    items = []
+    for n, it in enumerate(videos, 1):
+        src = DOWNLOAD_DIR / it["relpath"]
+        dest = src.with_suffix(".mp3")
+        title = f"@{owner} · Instagram" + (f" ({n})" if multi else "") if owner else None
+        if _to_mp3(src, dest, title=title, artist=owner and f"@{owner}"):
+            items.append(_media_info(dest, "audio"))
+    # Only the MP3s are kept.
+    for f in out_dir.iterdir():
+        if f.suffix != ".mp3":
+            f.unlink()
+    if not items:
+        raise DownloadError(
+            "There's no sound to save as MP3: this post is photos only, or its video is silent."
+        )
+    result["items"] = items
+    return result

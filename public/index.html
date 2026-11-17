@@ -82,8 +82,8 @@
   .tab.active svg { color: var(--accent); }
 
   /* ---------- quality cards ---------- */
-  .modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 18px; }
-  @media (max-width: 420px) { .modes { grid-template-columns: 1fr; } }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
   .mode-btn {
     min-width: 0; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
     padding: 13px 12px; border-radius: 8px; font: 500 13.5px 'Inter', sans-serif; cursor: pointer; text-align: left;
@@ -218,6 +218,18 @@
   .item .meta .snd { color: var(--ok); }
   .item .meta .snd.off { color: var(--muted); font-style: italic; }
 
+  /* audio (MP3) result: Pratham Audio Works-style bars that dance while it plays */
+  .item.audio .media, .grid.single .item.audio .media {
+    aspect-ratio: auto; max-height: none; background: var(--panel); display: flex; flex-direction: column;
+    align-items: stretch; gap: 16px; padding: 22px 18px 16px;
+  }
+  .eq { display: flex; align-items: center; justify-content: center; gap: 3px; height: 56px; }
+  .eq span { width: 4px; border-radius: 2px; background: var(--accent); opacity: .55; transform: scaleY(.35); transition: transform .3s ease, opacity .3s ease; }
+  .item.audio.playing .eq span { opacity: 1; animation: wave 1.1s ease-in-out infinite; }
+  @keyframes wave { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+  .item.audio audio { width: 100%; height: 40px; }
+  @media (prefers-reduced-motion: reduce) { .item.audio.playing .eq span { animation: none; transform: scaleY(.8); } }
+
   footer { margin-top: 26px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; }
   .credit { margin-top: 10px; text-align: center; font-size: 11.5px; color: var(--muted); opacity: .75; font-family: 'IBM Plex Mono', monospace; }
   .credit a { color: inherit; }
@@ -248,7 +260,7 @@
       </button>
     </div>
 
-    <div class="modes" role="radiogroup" aria-label="Video quality">
+    <div class="modes" role="radiogroup" aria-label="Download format">
       <button class="mode-btn active" data-q="best" role="radio" aria-checked="true">
         <span class="t">Highest quality</span>
         <span class="d">Sharpest · may not open in QuickTime</span>
@@ -256,6 +268,10 @@
       <button class="mode-btn" data-q="compat" role="radio" aria-checked="false">
         <span class="t">Max compatibility</span>
         <span class="d" id="compatDesc">H.264 MP4 · plays everywhere</span>
+      </button>
+      <button class="mode-btn" data-q="mp3" role="radio" aria-checked="false">
+        <span class="t">Audio only</span>
+        <span class="d" id="mp3Desc">MP3 · just the sound</span>
       </button>
     </div>
 
@@ -312,7 +328,7 @@
     </div>
   </div>
 
-  <footer>Works with Instagram and YouTube. Videos: the best video and audio streams are fetched separately and merged, often sharper than what the apps save. Photos: the original upload size, not the compressed preview. Only download content you own or have permission to use.</footer>
+  <footer>Works with Instagram and YouTube. Videos: the best video and audio streams are fetched separately and merged, often sharper than what the apps save. Photos: the original upload size, not the compressed preview. Audio only: the best audio track as a high-quality MP3. Only download content you own or have permission to use.</footer>
   <div class="credit">Made by Pratham Soni &middot; Open source (MIT) &middot; Not affiliated with Instagram, Meta, YouTube or Google</div>
 </div>
 
@@ -333,13 +349,17 @@
       sub: "Photos always download at their original resolution. The setting above only affects videos.",
       placeholder: "https://www.instagram.com/reel/…",
       compat: "H.264 MP4 · plays everywhere",
+      mp3: "MP3 · the sound of each video",
+      mp3sub: "Saves the sound of every video in the post as a high-quality MP3. Photos are skipped.",
       note: 'Private post, or Instagram says "try again later"?',
     },
     youtube: {
       what: "to a YouTube video or Short",
       sub: "Video and sound are fetched separately at their best and merged into one MP4.",
       placeholder: "https://youtube.com/shorts/…  or  https://youtu.be/…",
-      compat: "H.264 MP4 · up to 1080p · plays everywhere",
+      compat: "H.264 · up to 1080p · plays everywhere",
+      mp3: "MP3 · with title & cover art",
+      mp3sub: "Saves the best audio stream as a high-quality MP3, with the title, channel and thumbnail built in.",
       note: "About YouTube quality, age-restricted and live videos",
     },
   };
@@ -352,9 +372,10 @@
     });
     const t = PLATFORM_TEXT[p];
     $("linkWhat").textContent = t.what;
-    $("linkSub").textContent = t.sub;
     urlInput.placeholder = t.placeholder;
     $("compatDesc").textContent = t.compat;
+    $("mp3Desc").textContent = t.mp3;
+    updateSub();
     $("noteSummary").textContent = t.note;
     $("noteIg").hidden = p !== "instagram";
     $("noteYt").hidden = p !== "youtube";
@@ -372,13 +393,20 @@
     wake();
   }
 
-  // Quality cards
+  function updateSub() {
+    const t = PLATFORM_TEXT[platform];
+    $("linkSub").textContent = quality === "mp3" ? t.mp3sub : t.sub;
+  }
+
+  // Format cards
   document.querySelectorAll(".mode-btn").forEach((b) => b.addEventListener("click", () => {
     quality = b.dataset.q;
     document.querySelectorAll(".mode-btn").forEach((x) => {
       x.classList.toggle("active", x === b);
       x.setAttribute("aria-checked", x === b);
     });
+    updateSub();
+    onUrlChange();
   }));
 
   // Highlight the detected link type and update the button
@@ -396,7 +424,8 @@
     }
     if (busy) return;
     runBtn.disabled = !m;
-    runBtn.textContent = yt ? (yt[1] ? "Download Short" : "Download video") : ig ? "Download media"
+    runBtn.textContent = m && quality === "mp3" ? "Download MP3"
+      : yt ? (yt[1] ? "Download Short" : "Download video") : ig ? "Download media"
       : (urlInput.value.trim() ? "That isn't an Instagram or YouTube link" : "Paste a link to begin");
   }
   urlInput.addEventListener("input", onUrlChange);
@@ -432,7 +461,8 @@
     const tick = () => {
       const s = (Date.now() - t0) / 1000;
       const st = STAGES.filter((x) => s >= x[0]).pop();
-      $("statusLabel").textContent = serverAwake ? st[1] : "Waking up the server (up to a minute)…";
+      const label = quality === "mp3" && st[0] === 10 ? "Converting to MP3…" : st[1];
+      $("statusLabel").textContent = serverAwake ? label : "Waking up the server (up to a minute)…";
       $("statusTime").textContent = Math.floor(s) + "s";
       $("barFill").style.width = st[2] + "%";
     };
@@ -479,12 +509,14 @@
     current = data;
     const n = data.items.length;
     const photos = data.items.filter((i) => i.kind === "image").length;
-    const vids = n - photos;
+    const audios = data.items.filter((i) => i.kind === "audio").length;
+    const vids = n - photos - audios;
     const parts = [];
+    if (audios) parts.push(audios + (audios === 1 ? " MP3" : " MP3s"));
     if (vids) parts.push(vids + (vids === 1 ? " video" : " videos"));
     if (photos) parts.push(photos + (photos === 1 ? " photo" : " photos"));
     $("resTitle").textContent = data.platform === "youtube"
-      ? (data.owner ? data.owner + " · " : "") + (data.kind === "short" ? "YouTube Short" : "YouTube video")
+      ? (data.owner ? data.owner + " · " : "") + (audios ? "MP3" : data.kind === "short" ? "YouTube Short" : "YouTube video")
       : (data.owner ? "@" + data.owner + " · " : "") + parts.join(" + ");
     $("resCaption").textContent = data.caption || "";
     $("zipBtn").hidden = !data.zip;
@@ -493,21 +525,40 @@
 
     // Light up the detected type chips
     const kind = data.platform === "youtube" ? (data.kind === "short" ? "yt-short" : "yt-video")
-      : n > 1 ? "carousel" : (vids ? (/\/(reel|reels)\//.test(urlInput.value) ? "reel" : "video") : "photo");
+      : n > 1 ? "carousel" : (vids || audios ? (/\/(reel|reels)\//.test(urlInput.value) ? "reel" : "video") : "photo");
     document.querySelectorAll("#types span").forEach((s) => s.classList.toggle("hit", s.dataset.k === kind));
 
     grid.innerHTML = "";
     grid.classList.toggle("single", n === 1);
     data.items.forEach((it, i) => {
       const el = document.createElement("div");
-      el.className = "item";
-      const media = document.createElement(it.kind === "video" ? "video" : "img");
-      media.src = it.url;
-      if (it.kind === "video") { media.controls = true; media.playsInline = true; media.preload = "metadata"; }
-      else { media.alt = "Photo " + (i + 1); media.loading = "lazy"; }
+      el.className = "item" + (it.kind === "audio" ? " audio" : "");
       const wrap = document.createElement("div");
       wrap.className = "media";
-      wrap.appendChild(media);
+      if (it.kind === "audio") {
+        const eq = document.createElement("div");
+        eq.className = "eq";
+        eq.setAttribute("aria-hidden", "true");
+        for (let b = 0; b < 28; b++) {
+          const bar = document.createElement("span");
+          bar.style.height = (30 + 70 * Math.abs(Math.sin(b * 1.7 + i))) + "%";
+          bar.style.animationDelay = (-(b % 7) * 0.16) + "s";
+          eq.appendChild(bar);
+        }
+        const audio = document.createElement("audio");
+        audio.src = it.url;
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.addEventListener("play", () => el.classList.add("playing"));
+        ["pause", "ended"].forEach((ev) => audio.addEventListener(ev, () => el.classList.remove("playing")));
+        wrap.append(eq, audio);
+      } else {
+        const media = document.createElement(it.kind === "video" ? "video" : "img");
+        media.src = it.url;
+        if (it.kind === "video") { media.controls = true; media.playsInline = true; media.preload = "metadata"; }
+        else { media.alt = "Photo " + (i + 1); media.loading = "lazy"; }
+        wrap.appendChild(media);
+      }
       const info = document.createElement("div");
       info.className = "info";
       const meta = document.createElement("div");
@@ -516,7 +567,10 @@
       const sound = it.kind !== "video" || it.has_audio == null ? ""
         : it.has_audio ? `<br><span class="snd">♪ with audio</span>`
         : `<br><span class="snd off">no sound in original</span>`;
-      meta.innerHTML = `${res}${it.kind === "video" ? "MP4" : "JPG"} · ${fmtSize(it.size)}${sound}`;
+      const fmtDur = (sec) => { const t = Math.round(sec); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+      meta.innerHTML = it.kind === "audio"
+        ? `<b>MP3${it.bitrate ? " · " + it.bitrate + " kbps" : ""}</b><br>${it.duration ? fmtDur(it.duration) + " · " : ""}${fmtSize(it.size)}`
+        : `${res}${it.kind === "video" ? "MP4" : "JPG"} · ${fmtSize(it.size)}${sound}`;
       const a = document.createElement("a");
       a.className = "dl-btn";
       a.href = it.download;
