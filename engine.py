@@ -211,6 +211,8 @@ def _ytdlp_videos(url: str, out_dir: Path, shortcode: str, quality: str) -> list
         "no_warnings": True,
         "noprogress": True,
         "http_headers": {"User-Agent": UA},
+        "socket_timeout": 25,
+        "retries": 2,
     }
     if COOKIES_BROWSER:
         opts["cookiesfrombrowser"] = (COOKIES_BROWSER,)
@@ -219,8 +221,26 @@ def _ytdlp_videos(url: str, out_dir: Path, shortcode: str, quality: str) -> list
     return sorted(p for p in out_dir.glob(f"{shortcode}_v*.mp4"))
 
 
+class _NoWaitRateController(instaloader.RateController):
+    """Fail fast instead of sleeping for minutes when Instagram rate-limits us
+    (instaloader's default would leave the web request hanging)."""
+
+    def sleep(self, secs: float) -> None:
+        if secs > 2:
+            raise instaloader.exceptions.TooManyRequestsException(
+                "Instagram is rate-limiting this server."
+            )
+        super().sleep(secs)
+
+
 def _instaloader_nodes(shortcode: str):
-    L = instaloader.Instaloader(quiet=True, user_agent=UA)
+    L = instaloader.Instaloader(
+        quiet=True,
+        user_agent=UA,
+        max_connection_attempts=1,
+        request_timeout=25,
+        rate_controller=lambda ctx: _NoWaitRateController(ctx),
+    )
     post = instaloader.Post.from_shortcode(L.context, shortcode)
     if post.typename == "GraphSidecar":
         nodes = [
