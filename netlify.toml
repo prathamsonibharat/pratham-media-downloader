@@ -1,0 +1,11 @@
+# Netlify hosts the web page (public/). The download engine needs Python,
+# yt-dlp and ffmpeg, which Netlify can't run, so point public/config.js at
+# wherever the backend runs (see README → Deploying).
+[build]
+  publish = "public"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

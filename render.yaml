@@ -1,0 +1,12 @@
+# Render Blueprint: New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: pratham-ig-downloader-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false   # Render asks for it: your Netlify URL, e.g. https://pratham-ig.netlify.app

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pratham Instagram Media Downloader</title>
+<meta name="description" content="Paste an Instagram post, reel or carousel link and download the photos and videos at the highest quality available. Free and open source." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='8' fill='%2312100E' stroke='%23E8A33D' stroke-width='2.5'/%3E%3Cpath d='M16 9v11m-5-5 5 5 5-5' stroke='%23E8A33D' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12100E;
+    --panel: #1B1815;
+    --panel-2: #221E1A;
+    --line: #332D27;
+    --text: #F1ECE4;
+    --muted: #9A9086;
+    --accent: #E8A33D;
+    --accent-dim: #6B5228;
+    --ok: #6FAE8C;
+    --err: #D97A6A;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #FAF7F2; --panel: #FFFFFF; --panel-2: #F3EEE6; --line: #E3DACB; --text: #22201C;
+      --muted: #6E655A; --accent: #B5721E; --accent-dim: #E9D3AC; --ok: #2F7A57; --err: #B23A2A;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FAF7F2; --panel: #FFFFFF; --panel-2: #F3EEE6; --line: #E3DACB; --text: #22201C;
+    --muted: #6E655A; --accent: #B5721E; --accent-dim: #E9D3AC; --ok: #2F7A57; --err: #B23A2A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 48px 20px 64px;
+    padding-top: max(48px, env(safe-area-inset-top));
+  }
+  .wrap { width: 100%; max-width: 620px; }
+
+  /* ---------- header + logo mark (frames dropping into a tray) ---------- */
+  header { margin-bottom: 32px; }
+  .eyebrow-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .mark { position: relative; width: 26px; height: 24px; }
+  .mark i {
+    position: absolute; left: 50%; top: 0; width: 9px; height: 9px; margin-left: -4.5px;
+    border: 2px solid var(--accent); border-radius: 3px; opacity: 0;
+    animation: drop 2.4s cubic-bezier(.5,0,.6,1) infinite;
+  }
+  .mark i:nth-child(2) { animation-delay: .8s; }
+  .mark i:nth-child(3) { animation-delay: 1.6s; }
+  .mark b {
+    position: absolute; left: 1px; right: 1px; bottom: 0; height: 7px;
+    border: 2px solid var(--accent); border-top: 0; border-radius: 0 0 4px 4px;
+  }
+  @keyframes drop {
+    0%   { transform: translateY(-4px) scale(1); opacity: 0; }
+    15%  { opacity: 1; }
+    70%  { transform: translateY(12px) scale(.85); opacity: 1; }
+    85%, 100% { transform: translateY(14px) scale(.4); opacity: 0; }
+  }
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 34px; line-height: 1.15; margin: 0 0 10px; letter-spacing: -.01em; }
+  p.lede { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; max-width: 52ch; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; }
+
+  /* ---------- quality cards ---------- */
+  .modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 18px; }
+  @media (max-width: 420px) { .modes { grid-template-columns: 1fr; } }
+  .mode-btn {
+    min-width: 0; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 13px 12px; border-radius: 8px; font: 500 13.5px 'Inter', sans-serif; cursor: pointer; text-align: left;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .mode-btn .t { display: block; font-weight: 600; margin-bottom: 2px; }
+  .mode-btn .d { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+  .mode-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+  .mode-btn:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- link box ---------- */
+  .linkbox {
+    border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 26px 20px 22px; text-align: center;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .linkbox.hover, .linkbox:focus-within { border-color: var(--accent); background: var(--panel-2); }
+  .linkbox .main { font-size: 14.5px; margin: 0 0 4px; }
+  .linkbox .main b { color: var(--accent); font-weight: 600; }
+  .linkbox .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 16px; }
+  .field { display: flex; gap: 8px; }
+  .field input {
+    flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 12px 14px; font: 12.5px 'IBM Plex Mono', monospace;
+  }
+  .field input::placeholder { color: var(--muted); opacity: .7; }
+  .paste-btn {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 8px;
+    padding: 0 14px; font: 600 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap;
+  }
+  .types { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .types span {
+    font: 11.5px 'IBM Plex Mono', monospace; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .types span.hit { color: var(--accent); border-color: var(--accent); }
+
+  details.link-note { margin-top: 10px; }
+  details.link-note summary { cursor: pointer; font-size: 12.5px; color: var(--muted); list-style: none; user-select: none; }
+  details.link-note summary::-webkit-details-marker { display: none; }
+  details.link-note summary::before { content: "＋ "; }
+  details.link-note[open] summary::before { content: "－ "; }
+  details.link-note .body { font-size: 12.5px; color: var(--muted); line-height: 1.6; padding-top: 8px; }
+  details.link-note code { font-family: 'IBM Plex Mono', monospace; background: var(--panel-2); padding: 1px 5px; border-radius: 3px; }
+
+  .run-btn {
+    width: 100%; margin-top: 16px; background: var(--accent); color: #1B1207; border: none; border-radius: 8px;
+    padding: 14px; font: 600 15px 'Inter', sans-serif; cursor: pointer;
+  }
+  .run-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ---------- working animation: post → frames fall into the download tray ---------- */
+  .working { margin-top: 18px; padding: 18px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
+  .stage { position: relative; height: 112px; margin: 0 auto 14px; max-width: 320px; }
+  .post {
+    position: absolute; left: 50%; top: 0; width: 64px; height: 50px; margin-left: -32px;
+    border: 2px solid var(--line); border-radius: 9px; background: var(--panel);
+    display: grid; place-items: center;
+  }
+  .post::before { content: ""; width: 14px; height: 14px; border: 2px solid var(--muted); border-radius: 50%; }
+  .post::after { content: ""; position: absolute; top: 6px; right: 7px; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+  .frame {
+    position: absolute; left: 50%; top: 18px; width: 30px; height: 30px; margin-left: -15px;
+    border-radius: 6px; background: var(--accent-dim); border: 2px solid var(--accent); opacity: 0;
+    display: grid; place-items: center;
+    animation: fall 2.1s cubic-bezier(.55,0,.5,1) infinite;
+  }
+  .frame svg { width: 14px; height: 14px; color: var(--accent); }
+  .frame:nth-of-type(2) { animation-delay: .7s; --dx: -54px; }
+  .frame:nth-of-type(3) { animation-delay: 1.4s; --dx: 54px; }
+  .frame:nth-of-type(1) { --dx: 0px; }
+  @keyframes fall {
+    0%   { transform: translate(0, 0) scale(.5) rotate(0); opacity: 0; }
+    15%  { opacity: 1; transform: translate(calc(var(--dx) * .3), 18px) scale(.9) rotate(-6deg); }
+    65%  { transform: translate(var(--dx), 58px) scale(1) rotate(4deg); opacity: 1; }
+    85%, 100% { transform: translate(var(--dx), 72px) scale(.55) rotate(0); opacity: 0; }
+  }
+  .tray {
+    position: absolute; left: 12%; right: 12%; bottom: 0; height: 20px;
+    border: 2px solid var(--accent); border-top: 0; border-radius: 0 0 10px 10px;
+  }
+  .tray::after {
+    content: ""; position: absolute; left: 50%; bottom: 5px; width: 8px; height: 8px; margin-left: -4px;
+    border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(45deg);
+    animation: nudge 1s ease-in-out infinite;
+  }
+  @keyframes nudge { 50% { transform: translateY(3px) rotate(45deg); } }
+  .status-line { display: flex; justify-content: space-between; font: 12.5px 'IBM Plex Mono', monospace; color: var(--muted); margin-bottom: 6px; }
+  .bar-track { height: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .5s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .mark i, .frame, .tray::after { animation: none; }
+    .mark i:first-child, .frame:nth-of-type(1) { opacity: 1; }
+  }
+
+  .error-box {
+    margin-top: 16px; padding: 14px 16px; border-radius: 8px; background: var(--panel-2);
+    border: 1px solid var(--err); color: var(--err); font-size: 13px; line-height: 1.5;
+  }
+
+  /* ---------- results ---------- */
+  .result-head {
+    margin-top: 16px; padding: 14px 16px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--ok);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .result-head .t { font-weight: 600; font-size: 14px; }
+  .result-head .d { color: var(--muted); font-size: 12px; margin-top: 2px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dl-btn {
+    background: var(--ok); color: #0C1F16; text-decoration: none; padding: 9px 14px; border-radius: 6px;
+    font: 600 13px 'Inter', sans-serif; white-space: nowrap; border: none; cursor: pointer; display: inline-flex; align-items: center;
+  }
+  .ghost-btn {
+    background: none; border: 1px solid var(--line); color: var(--text); padding: 8px 12px; border-radius: 6px;
+    font: 600 13px 'Inter', sans-serif; cursor: pointer;
+  }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+  @media (max-width: 460px) { .grid { grid-template-columns: 1fr; } }
+  .item {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+    display: flex; flex-direction: column; animation: pop .35s ease both;
+  }
+  .item:nth-child(2) { animation-delay: .06s; } .item:nth-child(3) { animation-delay: .12s; } .item:nth-child(4) { animation-delay: .18s; }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } }
+  .item .media { background: #000; aspect-ratio: 4/5; }
+  .item img, .item video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .item .info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .item .meta { font: 11.5px 'IBM Plex Mono', monospace; color: var(--muted); line-height: 1.45; }
+  .item .meta b { color: var(--text); font-weight: 500; }
+
+  footer { margin-top: 26px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .credit { margin-top: 10px; text-align: center; font-size: 11.5px; color: var(--muted); opacity: .75; font-family: 'IBM Plex Mono', monospace; }
+  .credit a { color: inherit; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow-row">
+      <div class="mark" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+      <div class="eyebrow">Pratham Instagram Media Downloader</div>
+    </div>
+    <h1>Paste the link, keep the post. At full quality.</h1>
+    <p class="lede">Reels, videos, single photos and carousels: paste an Instagram link and get every photo and clip at the highest resolution Instagram serves. No watermark, no sign-up, no re-compression.</p>
+  </header>
+
+  <div class="panel">
+    <div class="modes" role="radiogroup" aria-label="Video quality">
+      <button class="mode-btn active" data-q="best" role="radio" aria-checked="true">
+        <span class="t">Highest quality</span>
+        <span class="d">Sharpest stream · may be VP9</span>
+      </button>
+      <button class="mode-btn" data-q="compat" role="radio" aria-checked="false">
+        <span class="t">Max compatibility</span>
+        <span class="d">H.264 MP4 · plays everywhere</span>
+      </button>
+    </div>
+
+    <form id="form" class="linkbox" novalidate>
+      <p class="main"><b>Paste a link</b> to a post, reel or carousel</p>
+      <p class="sub">Photos always download at their original resolution. The setting above only affects videos.</p>
+      <div class="field">
+        <input type="url" id="url" placeholder="https://www.instagram.com/reel/…" autocomplete="off" spellcheck="false" aria-label="Instagram link" />
+        <button type="button" class="paste-btn" id="pasteBtn">Paste</button>
+      </div>
+      <div class="types" id="types">
+        <span data-k="reel">Reel</span><span data-k="video">Video</span><span data-k="photo">Photo</span><span data-k="carousel">Carousel</span>
+      </div>
+    </form>
+
+    <details class="link-note">
+      <summary>Private post, or Instagram says "try again later"?</summary>
+      <div class="body">
+        Only public posts work without signing in, and Instagram limits how many it hands out per hour.
+        If you run this tool yourself, start it with <code>IG_COOKIES_BROWSER=chrome ./run.sh</code> so it uses your own logged-in browser session. That also unlocks 1080p for many reels.
+      </div>
+    </details>
+
+    <button class="run-btn" id="runBtn" disabled>Paste a link to begin</button>
+
+    <div class="working" id="working" hidden>
+      <div class="stage" aria-hidden="true">
+        <div class="post"></div>
+        <div class="frame"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m3 17 6-6 5 5 3-3 4 4"/></svg></div>
+        <div class="frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="7" y="7" width="14" height="14" rx="2"/><path d="M3 15V5a2 2 0 0 1 2-2h10"/></svg></div>
+        <div class="tray"></div>
+      </div>
+      <div class="status-line"><span id="statusLabel">Reading the post…</span><span id="statusTime">0s</span></div>
+      <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    </div>
+
+    <div class="error-box" id="errorBox" hidden></div>
+
+    <div id="results" hidden>
+      <div class="result-head">
+        <div><div class="t" id="resTitle"></div><div class="d" id="resCaption"></div></div>
+        <div class="head-actions">
+          <a class="dl-btn" id="zipBtn" href="#">Download all (.zip)</a>
+          <button class="ghost-btn" id="revealBtn" type="button">Show in Finder</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <footer>Videos: the best video and audio streams are fetched separately and merged, often sharper than the file Instagram's app saves. Photos: the original upload size, not the compressed preview. Only download content you own or have permission to use.</footer>
+  <div class="credit">Made by Pratham Soni &middot; Open source (MIT) &middot; Not affiliated with Instagram or Meta</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const API = (window.PIMD_API_BASE || "").replace(/\/$/, "");
+  const $ = (id) => document.getElementById(id);
+  const urlInput = $("url"), runBtn = $("runBtn"), working = $("working"), errorBox = $("errorBox");
+  const results = $("results"), grid = $("grid");
+  const IG_RE = /instagram\.com\/(?:[\w.]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
+  let quality = "best", busy = false, current = null;
+
+  // A free hosted backend sleeps when idle; poke it as soon as the page opens
+  // so it's usually awake by the time a link is pasted.
+  let serverAwake = !API;
+  if (API) {
+    const wake = () => fetch(API + "/healthz", { cache: "no-store" })
+      .then((r) => { if (r.ok) serverAwake = true; else throw 0; })
+      .catch(() => setTimeout(wake, 5000));
+    wake();
+  }
+
+  // Quality cards
+  document.querySelectorAll(".mode-btn").forEach((b) => b.addEventListener("click", () => {
+    quality = b.dataset.q;
+    document.querySelectorAll(".mode-btn").forEach((x) => {
+      x.classList.toggle("active", x === b);
+      x.setAttribute("aria-checked", x === b);
+    });
+  }));
+
+  // Highlight the detected link type and update the button
+  let lastUrl = null;
+  function onUrlChange() {
+    const m = urlInput.value.match(IG_RE);
+    if (urlInput.value !== lastUrl) {
+      lastUrl = urlInput.value;
+      document.querySelectorAll("#types span").forEach((s) => s.classList.remove("hit"));
+      const k = !m || m[1] === "p" ? null : (m[1] === "tv" ? "video" : "reel");
+      if (k) document.querySelector(`#types [data-k=${k}]`).classList.add("hit");
+    }
+    if (busy) return;
+    runBtn.disabled = !m;
+    runBtn.textContent = m ? "Download media" : (urlInput.value.trim() ? "That isn't an Instagram post link" : "Paste a link to begin");
+  }
+  urlInput.addEventListener("input", onUrlChange);
+  urlInput.addEventListener("paste", () => setTimeout(() => { onUrlChange(); if (!runBtn.disabled) start(); }, 0));
+
+  $("pasteBtn").addEventListener("click", async () => {
+    try {
+      urlInput.value = (await navigator.clipboard.readText()).trim();
+      onUrlChange();
+      if (!runBtn.disabled) start();
+    } catch (e) { urlInput.focus(); }
+  });
+
+  // Drag a link onto the box
+  const box = $("form");
+  ["dragenter", "dragover"].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.add("hover"); }));
+  ["dragleave", "drop"].forEach((ev) => box.addEventListener(ev, (e) => { e.preventDefault(); box.classList.remove("hover"); }));
+  box.addEventListener("drop", (e) => {
+    const t = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if (t) { urlInput.value = t.trim(); onUrlChange(); if (!runBtn.disabled) start(); }
+  });
+  box.addEventListener("submit", (e) => { e.preventDefault(); if (!runBtn.disabled) start(); });
+  runBtn.addEventListener("click", start);
+
+  // Working animation + staged progress (the server does it all in one request)
+  const STAGES = [[0, "Reading the post…", 12], [2, "Finding the highest quality…", 35], [5, "Downloading media…", 60], [10, "Merging video and audio…", 80], [20, "Almost there…", 92]];
+  let timer = null;
+  function showWorking(on) {
+    working.hidden = !on;
+    clearInterval(timer);
+    if (!on) return;
+    const t0 = Date.now();
+    const tick = () => {
+      const s = (Date.now() - t0) / 1000;
+      const st = STAGES.filter((x) => s >= x[0]).pop();
+      $("statusLabel").textContent = serverAwake ? st[1] : "Waking up the server (up to a minute)…";
+      $("statusTime").textContent = Math.floor(s) + "s";
+      $("barFill").style.width = st[2] + "%";
+    };
+    tick();
+    timer = setInterval(tick, 250);
+  }
+
+  const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+
+  async function start() {
+    if (busy) return;
+    busy = true;
+    runBtn.disabled = true;
+    runBtn.textContent = "Working…";
+    errorBox.hidden = true;
+    results.hidden = true;
+    showWorking(true);
+    try {
+      const r = await fetch(API + "/api/fetch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput.value.trim(), quality }),
+      });
+      let data;
+      try { data = await r.json(); } catch (e) { throw new Error("The server didn't answer properly (HTTP " + r.status + ")."); }
+      serverAwake = true;
+      if (!r.ok) throw new Error(data.error || "Something went wrong.");
+      $("barFill").style.width = "100%";
+      render(data);
+    } catch (err) {
+      errorBox.textContent = err.message === "Failed to fetch"
+        ? (API ? "Couldn't reach the download server. It may still be waking up, so try again in a few seconds."
+               : "Couldn't reach the download server. Make sure ./run.sh is still running.")
+        : err.message;
+      errorBox.hidden = false;
+    } finally {
+      showWorking(false);
+      busy = false;
+      onUrlChange();
+    }
+  }
+
+  function render(data) {
+    current = data;
+    const n = data.items.length;
+    const photos = data.items.filter((i) => i.kind === "image").length;
+    const vids = n - photos;
+    const parts = [];
+    if (vids) parts.push(vids + (vids === 1 ? " video" : " videos"));
+    if (photos) parts.push(photos + (photos === 1 ? " photo" : " photos"));
+    $("resTitle").textContent = (data.owner ? "@" + data.owner + " · " : "") + parts.join(" + ");
+    $("resCaption").textContent = data.caption || "";
+    $("zipBtn").hidden = !data.zip;
+    if (data.zip) $("zipBtn").href = data.zip;
+    $("revealBtn").hidden = !data.can_reveal;
+
+    // Light up the detected type chips
+    const kind = n > 1 ? "carousel" : (vids ? (/\/(reel|reels)\//.test(urlInput.value) ? "reel" : "video") : "photo");
+    document.querySelectorAll("#types span").forEach((s) => s.classList.toggle("hit", s.dataset.k === kind));
+
+    grid.innerHTML = "";
+    data.items.forEach((it, i) => {
+      const el = document.createElement("div");
+      el.className = "item";
+      const media = document.createElement(it.kind === "video" ? "video" : "img");
+      media.src = it.url;
+      if (it.kind === "video") { media.controls = true; media.playsInline = true; media.preload = "metadata"; }
+      else { media.alt = "Photo " + (i + 1); media.loading = "lazy"; }
+      const wrap = document.createElement("div");
+      wrap.className = "media";
+      wrap.appendChild(media);
+      const info = document.createElement("div");
+      info.className = "info";
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const res = it.width ? `<b>${it.width}×${it.height}</b><br>` : "";
+      meta.innerHTML = `${res}${it.kind === "video" ? "MP4" : "JPG"} · ${fmtSize(it.size)}`;
+      const a = document.createElement("a");
+      a.className = "dl-btn";
+      a.href = it.download;
+      a.textContent = "Download";
+      info.append(meta, a);
+      el.append(wrap, info);
+      grid.appendChild(el);
+    });
+    results.hidden = false;
+    results.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("revealBtn").addEventListener("click", () => {
+    if (!current) return;
+    fetch(API + "/api/reveal", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder: current.folder.split("/").pop() }) });
+  });
+})();
+</script>
+</body>
+</html>
