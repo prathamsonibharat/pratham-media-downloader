@@ -335,7 +335,10 @@
 <script src="config.js"></script>
 <script>
 (function () {
-  const API = (window.PMD_API_BASE || "").replace(/\/$/, "");
+  // Opened from your own computer (./run.sh) → always use that local server,
+  // even though config.js points the hosted site at Render.
+  const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const API = isLocal ? "" : (window.PMD_API_BASE || "").replace(/\/$/, "");
   const $ = (id) => document.getElementById(id);
   const urlInput = $("url"), runBtn = $("runBtn"), working = $("working"), errorBox = $("errorBox");
   const results = $("results"), grid = $("grid");
