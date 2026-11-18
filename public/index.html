@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Pratham Media Downloader</title>
 <meta name="description" content="Paste an Instagram post, reel or carousel link, or a YouTube video or Short, and download it at the highest quality available. Free and open source." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='8' fill='%2312100E' stroke='%23E8A33D' stroke-width='2.5'/%3E%3Cpath d='M16 9v11m-5-5 5 5 5-5' stroke='%23E8A33D' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#12100E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -43,27 +47,18 @@
   }
   .wrap { width: 100%; max-width: 620px; }
 
-  /* ---------- header + logo mark (frames dropping into a tray) ---------- */
+  /* ---------- header logo (cream wordmark on dark, original on light) ---------- */
   header { margin-bottom: 32px; }
-  .eyebrow-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .mark { position: relative; width: 26px; height: 24px; }
-  .mark i {
-    position: absolute; left: 50%; top: 0; width: 9px; height: 9px; margin-left: -4.5px;
-    border: 2px solid var(--accent); border-radius: 3px; opacity: 0;
-    animation: drop 2.4s cubic-bezier(.5,0,.6,1) infinite;
+  .brand { display: inline-block; margin-bottom: 18px; }
+  .logo { height: 60px; width: auto; display: block; }
+  .logo-l { display: none; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .logo-d { display: none; }
+    :root:not([data-theme="dark"]) .logo-l { display: block; }
   }
-  .mark i:nth-child(2) { animation-delay: .8s; }
-  .mark i:nth-child(3) { animation-delay: 1.6s; }
-  .mark b {
-    position: absolute; left: 1px; right: 1px; bottom: 0; height: 7px;
-    border: 2px solid var(--accent); border-top: 0; border-radius: 0 0 4px 4px;
-  }
-  @keyframes drop {
-    0%   { transform: translateY(-4px) scale(1); opacity: 0; }
-    15%  { opacity: 1; }
-    70%  { transform: translateY(12px) scale(.85); opacity: 1; }
-    85%, 100% { transform: translateY(14px) scale(.4); opacity: 0; }
-  }
+  :root[data-theme="light"] .logo-d { display: none; }
+  :root[data-theme="light"] .logo-l { display: block; }
+  @media (max-width: 420px) { .logo { height: 50px; } }
   .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
   h1 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 34px; line-height: 1.15; margin: 0 0 10px; letter-spacing: -.01em; }
   p.lede { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0; max-width: 52ch; }
@@ -174,8 +169,8 @@
   .bar-track { height: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
   .bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .5s ease; }
   @media (prefers-reduced-motion: reduce) {
-    .mark i, .frame, .tray::after { animation: none; }
-    .mark i:first-child, .frame:nth-of-type(1) { opacity: 1; }
+    .frame, .tray::after { animation: none; }
+    .frame:nth-of-type(1) { opacity: 1; }
   }
 
   .error-box {
@@ -240,9 +235,9 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow-row">
-      <div class="mark" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
-      <div class="eyebrow">Pratham Media Downloader</div>
+    <div class="brand">
+      <img class="logo logo-d" src="logo-dark.png" width="900" height="266" alt="Pratham Media Downloader" />
+      <img class="logo logo-l" src="logo-light.png" width="900" height="266" alt="Pratham Media Downloader" />
     </div>
     <h1>Paste the link, keep the video. At full quality.</h1>
     <p class="lede">Instagram reels, photos and carousels, plus YouTube videos and Shorts. Paste a link and get the highest resolution the platform serves, with sound. No watermark, no sign-up, no re-compression.</p>
